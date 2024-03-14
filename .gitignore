@@ -1,0 +1,10 @@
+ComputationalMechanics/.vs/
+ComputationalMechanics/Debug/
+ComputationalMechanics/Release/
+ComputationalMechanics/x64/
+
+ComputationalMechanics/ComputationalMechanics/Debug/
+ComputationalMechanics/ComputationalMechanics/Release/
+ComputationalMechanics/ComputationalMechanics/x64/
+ComputationalMechanics/ComputationalMechanics/OpenGL/imgui.ini
+*.user
