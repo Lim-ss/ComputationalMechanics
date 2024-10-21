@@ -60,6 +60,7 @@ namespace module {
 		void ColorUpdate();
 		void PrintTemperature();
 		void PrintMatrixK();
+		void OutputData(std::string filepath);
 	private:
 
 		glm::mat4 m_Proj;
@@ -86,5 +87,9 @@ namespace module {
 		BoundaryType outsideBoundary;
 		double insideBoundaryValue;//固定的温度值
 		double outsideBoundaryValue;//固定的流入热量值
+
+		char m_input1[8] = "400";
+		char m_input2[8] = "300";
+		
 	};
 }

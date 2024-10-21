@@ -33,7 +33,8 @@ namespace module {
 		void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) override;
 		void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) override;
 
-		void Calculate();
+		void CalculateDeflections();
+		void CalculateMoments();
 	private:
 
 		glm::mat4 m_Proj;
@@ -51,7 +52,6 @@ namespace module {
 		std::vector<unsigned int> m_Indices;
 		std::vector<int> m_FixedVertices;
 
-		bool m_WireframeMode;
 		float m_scale;
 
 		double E;

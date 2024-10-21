@@ -13,6 +13,8 @@
 #include "Eigen/Dense"
 #include "Eigen/Sparse"
 
+#include <fstream>
+
 static const double pi = 3.141592653589793;
 
 namespace module {
@@ -29,8 +31,8 @@ namespace module {
         n2(16),
         insideBoundary(BoundaryType::FixedTemperature),
         insideBoundaryValue(400),
-        outsideBoundary(BoundaryType::FixedHeatFlux),
-        outsideBoundaryValue(-5)
+        outsideBoundary(BoundaryType::FixedTemperature),
+        outsideBoundaryValue(-100)
     {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_BLEND);
@@ -103,6 +105,12 @@ namespace module {
 
     void Problem2::OnImguiRender()
     {
+        ImGui::SliderInt("mesh size", &n1, 8, 96);
+
+        if (ImGui::Button("Resize Mesh"))
+        {
+            GenerateMesh();
+        }
         if (ImGui::Button("Calculate"))
         {
             TemperatureUpdate();
@@ -112,9 +120,37 @@ namespace module {
         {
             PrintTemperature();
         }
+        if (ImGui::Button("OutputData"))
+        {
+            OutputData("Temperature.data");
+        }
+
+        ImGui::Text("insideBoundary:");
+        ImGui::PushItemWidth(50);  // 将输入框的宽度设置为 100 像素
+        ImGui::InputText("value1", m_input1, IM_ARRAYSIZE(m_input1));
+        ImGui::PopItemWidth();  // 恢复默认的宽度
+        ImGui::SameLine();
+        ImGui::PushID("insideBoundary");//防止ID冲突
+        ImGui::RadioButton("FixedTemperature",  (int*)&insideBoundary, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("FixedHeatFlux", (int*)&insideBoundary, 1);
+        ImGui::PopID();
         
 
-        ImGui::SliderFloat("model scale", &m_scale, -2.0f, 2.0f);
+        ImGui::Text("outsideBoundary:");
+        ImGui::PushItemWidth(50);
+        ImGui::InputText("value2", m_input2, IM_ARRAYSIZE(m_input2));
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+        ImGui::PushID("outsideBoundary");
+        ImGui::RadioButton("FixedTemperature", (int*)&outsideBoundary, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("FixedHeatFlux", (int*)&outsideBoundary, 1);
+        ImGui::PopID();
+
+        insideBoundaryValue = atof(m_input1);
+        outsideBoundaryValue = atof(m_input2);
+        n2 = n1;
 
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / m_IO.Framerate, m_IO.Framerate);
 
@@ -189,7 +225,7 @@ namespace module {
             glm::vec3 v1 = m_Vertices[face.v1].position;
             glm::vec3 v2 = m_Vertices[face.v2].position;
             glm::vec3 v3 = m_Vertices[face.v3].position;
-            double delta = -(v1.x - v2.x) * (v3.y - v2.y) + (v1.y - v2.y) * (v3.x - v2.x);
+            double delta = (-(v1.x - v2.x) * (v3.y - v2.y) + (v1.y - v2.y) * (v3.x - v2.x)) / 2;
             double a1 = v2.y - v3.y;
             double b1 = v3.x - v2.x;
             double a2 = v3.y - v1.y;
@@ -246,10 +282,12 @@ namespace module {
         }
         else
         {
-            for (int i = 0;i < n2 + 1;i++)
+            for (int i = 1;i < n2;i++)
             {
-                matrixb.coeffRef(i, 0) += insideBoundaryValue;
+                matrixb.coeffRef(i, 0) += insideBoundaryValue * (0.5 * pi * 0.5) / n2;
             }
+            matrixb.coeffRef(0, 0) += insideBoundaryValue * (0.5 * pi * 0.5) / n2 / 2;
+            matrixb.coeffRef(n2, 0) += insideBoundaryValue * (0.5 * pi * 0.5) / n2 / 2;
         }
         //外璧边界条件
         if (outsideBoundary == BoundaryType::FixedTemperature)
@@ -268,10 +306,12 @@ namespace module {
         }
         else
         {
-            for (int i = n1 * (n2 + 1);i < (n1 + 1) * (n2 + 1);i++)
+            for (int i = n1 * (n2 + 1) + 1;i < (n1 + 1) * (n2 + 1) - 1;i++)
             {
-                matrixb.coeffRef(i, 0) += outsideBoundaryValue;
+                matrixb.coeffRef(i, 0) += outsideBoundaryValue * (0.5 * pi * 1.5) / n2;
             }
+            matrixb.coeffRef(n1 * (n2 + 1), 0) += outsideBoundaryValue * (0.5 * pi * 1.5) / n2 / 2;
+            matrixb.coeffRef((n1 + 1) * (n2 + 1) - 1, 0) += outsideBoundaryValue * (0.5 * pi * 1.5) / n2 / 2;
         }
         //侧面边界条件
         //相当于热流边界条件，但是值为0，无需操作
@@ -283,15 +323,6 @@ namespace module {
         solver.factorize(matrixA);
         Eigen::MatrixXd matrixx((n1 + 1) * (n2 + 1), 1);
         matrixx = solver.solve(matrixb);
-
-        /*for (int i = 0;i < (n1 + 1) * (n2 + 1);i++)
-        {
-            for (int j = 0;j < (n1 + 1) * (n2 + 1);j++)
-            {
-                printf("%.2f ", matrixA.coeff(i, j));
-            }
-            printf("\n");
-        }*/
 
         for (int i = 0;i < (n1 + 1) * (n2 + 1);i++)
         {
@@ -341,5 +372,23 @@ namespace module {
         {
             std::cout << "face:" << i << std::endl << m_Faces[i].matrixK << std::endl;
         }
+    }
+
+    void Problem2::OutputData(std::string filepath)
+    {
+        //产生用于绘图的数据，输出到外部文件里
+        std::ofstream fout;
+        fout.open(filepath, std::ios::out);
+        float x;
+        float T;
+        for (int i = 0;i < n1 + 1;i++)
+        {
+            x = 0.5 * (float)i / n1;
+            T = m_Vertices[(n2 + 1) * i].temperature;
+            fout << x << " " << T << std::endl;
+        }
+        fout.close();
+
+        std::cout << "output data" << std::endl;
     }
 }

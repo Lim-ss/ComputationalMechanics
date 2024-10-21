@@ -23,7 +23,6 @@ namespace module {
         m_Model(glm::mat4(1.0f)),
         m_MVP(glm::mat4(1.0f)),
         m_IO(ImGui::GetIO()),
-        m_WireframeMode(false),
         m_scale(-2.0f),
         /*E(100 * 4.45 / pow(0.0254, 2)),
 		A(0.2 * pow(0.0254, 2)),
@@ -75,11 +74,6 @@ namespace module {
             { 0.0f,  0.0f,  37.5f },//27  15
         };
         
-        /*std::vector<glm::vec3> Vertices =
-        {
-            {10.0f, 0.0f, 0.0f},
-            {0.0f, 0.0f, 0.0f},
-        };*/
         m_Vertices.insert(m_Vertices.end(), Vertices.begin(), Vertices.end());
         
         std::vector<unsigned int> Indices =
@@ -133,10 +127,6 @@ namespace module {
             25, 13,
         };
         
-        /*std::vector<unsigned int> Indices =
-        {
-            0,1,
-        };*/
         m_Indices.insert(m_Indices.end(), Indices.begin(), Indices.end());
 
         //有四个点是固定的，增加维数以限制其位移
@@ -144,7 +134,6 @@ namespace module {
         m_FixedVertices.push_back(20);
         m_FixedVertices.push_back(23);
         m_FixedVertices.push_back(24);
-        //m_FixedVertices.push_back(1);
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_BLEND);
@@ -159,31 +148,24 @@ namespace module {
         m_Shader = std::make_unique<Shader>("res/shaders/Lines.shader");
         m_Shader->Bind();
         m_Camera = std::make_unique<Camera>(m_View);
-
-        //glEnable(GL_POLYGON_OFFSET_FILL); // 启用填充面的多边形偏移
-        //glPolygonOffset(0.5f, 0.1f); // 设置多边形偏移因子和单位
-        printf("num:%d\n", m_Indices.size());
+        m_Camera->m_cameraPos = glm::vec3(1.54f, 0.94f, 1.58f);
+        m_Camera->yaw = 48.15f;
+        m_Camera->pitch = -12.6f;
     }
 
     Problem1::~Problem1()
     {
         glDisable(GL_DEPTH_TEST);
-        glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
     void Problem1::OnUpdate(double deltaTime)
     {
         m_Camera->CameraUpdate(deltaTime);
-        m_Model = glm::scale(glm::mat4(1.0f), glm::vec3(pow(10.0f, m_scale)));//调整模型大小
+        m_Model = glm::scale(glm::mat4(1.0f), glm::vec3(pow(10.0f, m_scale)));
     }
 
     void Problem1::OnRender()
     {
-        if (m_WireframeMode)
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        else
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
         int width, height;
         GLFWwindow* window = glfwGetCurrentContext();
         if (!glfwGetWindowAttrib(window, GLFW_ICONIFIED))
@@ -215,7 +197,8 @@ namespace module {
     {
         if (ImGui::Button("Calculate"))
         {
-            Calculate();
+            CalculateDeflections();
+            CalculateMoments();
         }
 
         ImGui::SliderFloat("model scale", &m_scale, -2.0f, 2.0f);
@@ -244,7 +227,7 @@ namespace module {
         Camera::ScrollCallback(window, xoffset, yoffset);
     }
 
-    void Problem1::Calculate()
+    void Problem1::CalculateDeflections()
     {
         // Ax = b
         Eigen::SparseMatrix<double> matrixA(m_Vertices.size() * 6, m_Vertices.size() * 6);
@@ -331,22 +314,22 @@ namespace module {
                 matrixK_.coeffRef(11, 7) = (double)-6 * E * Iz / pow(l, 2);
                 matrixK_.coeffRef(11, 11)= (double)4 * E * Iz / pow(l, 1);
 
-                matrixK_.coeffRef(2, 2)  = (double)-12 * E * Iz / pow(l, 3);
-                matrixK_.coeffRef(2, 4)  = (double)6 * E * Iz / pow(l, 2);
-                matrixK_.coeffRef(2, 8)  = (double)12 * E * Iz / pow(l, 3);
-                matrixK_.coeffRef(2, 10) = (double)6 * E * Iz / pow(l, 2);
-                matrixK_.coeffRef(4, 2)  = (double)6 * E * Iz / pow(l, 2);
-                matrixK_.coeffRef(4, 4)  = (double)-4 * E * Iz / pow(l, 1);
-                matrixK_.coeffRef(4, 8)  = (double)-6 * E * Iz / pow(l, 2);
-                matrixK_.coeffRef(4, 10) = (double)-2 * E * Iz / pow(l, 1);
-                matrixK_.coeffRef(8, 2)  = (double)12 * E * Iz / pow(l, 3);
-                matrixK_.coeffRef(8, 4)  = (double)-6 * E * Iz / pow(l, 2);
-                matrixK_.coeffRef(8, 8)  = (double)-12 * E * Iz / pow(l, 3);
-                matrixK_.coeffRef(8, 10) = (double)-6 * E * Iz / pow(l, 2);
-                matrixK_.coeffRef(10, 2) = (double)6 * E * Iz / pow(l, 2);
-                matrixK_.coeffRef(10, 4) = (double)-2 * E * Iz / pow(l, 1);
-                matrixK_.coeffRef(10, 8) = (double)-6 * E * Iz / pow(l, 2);
-                matrixK_.coeffRef(10, 10)= (double)-4 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(2, 2)  = (double)12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(2, 4)  = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(2, 8)  = (double)-12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(2, 10) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(4, 2)  = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(4, 4)  = (double)4 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(4, 8)  = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(4, 10) = (double)2 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(8, 2)  = (double)-12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(8, 4)  = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(8, 8)  = (double)12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(8, 10) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(10, 2) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(10, 4) = (double)2 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(10, 8) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(10, 10)= (double)4 * E * Iz / pow(l, 1);
             }
             //K = T(T) * K_ * T
             matrixK = matrixT.transpose() * matrixK_ * matrixT;
@@ -395,8 +378,6 @@ namespace module {
 
                 }
             }
-            if(i == 0)
-            std::cout << matrixK << std::endl<<std::endl;
         }//对每根梁的循环
 
         //由于目前载荷数量较少，且没有改变的需求，先直接在这里构造矩阵b，而不是在循环里添加元素
@@ -407,7 +388,6 @@ namespace module {
         //根据固定点边界条件修改矩阵
         for (int j = 0;j < m_FixedVertices.size();j++)
         {
-            printf("index = %d\n", m_FixedVertices[j]);
             int vIndex = m_FixedVertices[j];//要固定的点的索引
             for (int k = 0;k < m_Vertices.size() * 6;k++)
             {
@@ -443,13 +423,6 @@ namespace module {
         }
 
 
-        //debug
-        /*for (int k = 0;k < m_Vertices.size() * 6;k++)
-        {
-            printf("(120,%d):%.2lf,%.2lf\n", k,matrixA.coeff(120, k), matrixb.coeff(k, 0));
-        }*/
-
-
         //解方程Ax=b
         //是方阵，能用LU分解
         Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
@@ -476,5 +449,125 @@ namespace module {
             printf("%.2f,\t\t%.2f,\t\t%.2f\n", matrixx.coeff(j * 6 + 3, 0), matrixx.coeff(j * 6 + 4, 0), matrixx.coeff(j * 6 + 5, 0));
         }
         
+    }
+
+    void Problem1::CalculateMoments()
+    {
+        for (int i = 0;i < m_Indices.size() / 2;i++)
+        {
+            //对每条梁循环
+            int v1Index = m_Indices[2 * i];
+            int v2Index = m_Indices[2 * i + 1];
+            glm::vec3 v1 = m_Vertices[v1Index];
+            glm::vec3 v2 = m_Vertices[v2Index];
+            glm::vec3 diretion = v2 - v1;
+            glm::vec3 axis_x;//局部坐标系三个轴在总体坐标系中的向量
+            glm::vec3 axis_y;
+            glm::vec3 axis_z;
+            double l = glm::length(diretion);
+            if (diretion.x == 0 && diretion.y == 0)
+            {
+                //梁竖直，做特殊处理
+                axis_x = glm::vec3(0.0f, 0.0f, 1.0f);
+                axis_y = glm::vec3(1.0f, 0.0f, 0.0f);
+                axis_z = glm::vec3(0.0f, 1.0f, 0.0f);
+            }
+            else if (diretion.z == 0)
+            {
+                //梁水平，做特殊处理
+                axis_x = glm::normalize(diretion);
+                axis_z = glm::vec3(0.0f, 0.0f, 1.0f);
+                axis_y = glm::normalize(glm::cross(axis_z, axis_x));
+            }
+            else
+            {
+                axis_x = glm::normalize(diretion);
+                glm::vec3 projection = glm::vec3(axis_x.x, axis_x.y, 0.0f);//diretion在水平面投影
+                axis_y = glm::normalize(glm::cross(axis_x, projection));
+                axis_z = glm::normalize(glm::cross(axis_x, axis_y));
+            }
+            Eigen::MatrixXd matrix_lambda(3, 3);//用于拼成坐标变换矩阵
+            {
+                glm::vec3 x = glm::vec3(1.0f, 0.0f, 0.0f);
+                glm::vec3 y = glm::vec3(0.0f, 1.0f, 0.0f);
+                glm::vec3 z = glm::vec3(0.0f, 0.0f, 1.0f);
+                matrix_lambda <<
+                    (double)glm::dot(x, axis_x), (double)glm::dot(x, axis_y), (double)glm::dot(x, axis_z),
+                    (double)glm::dot(y, axis_x), (double)glm::dot(y, axis_y), (double)glm::dot(y, axis_z),
+                    (double)glm::dot(z, axis_x), (double)glm::dot(z, axis_y), (double)glm::dot(z, axis_z);
+            }
+            Eigen::MatrixXd matrixT(12, 12);//坐标变换矩阵
+            matrixT.setZero();
+            matrixT.block(0, 0, matrix_lambda.rows(), matrix_lambda.cols()) = matrix_lambda;
+            matrixT.block(3, 3, matrix_lambda.rows(), matrix_lambda.cols()) = matrix_lambda;
+            matrixT.block(6, 6, matrix_lambda.rows(), matrix_lambda.cols()) = matrix_lambda;
+            matrixT.block(9, 9, matrix_lambda.rows(), matrix_lambda.cols()) = matrix_lambda;
+            Eigen::MatrixXd matrixK_(12, 12);//局部坐标系下的刚度矩阵
+            Eigen::MatrixXd matrixK(12, 12);//总体坐标系下的刚度矩阵
+            //向matrixK_填入元素
+            {
+                matrixK_.setZero();
+
+                matrixK_.coeffRef(0, 0) = (double)E * A / l;
+                matrixK_.coeffRef(0, 6) = (double)-E * A / l;
+                matrixK_.coeffRef(6, 0) = (double)-E * A / l;
+                matrixK_.coeffRef(6, 6) = (double)E * A / l;
+
+                matrixK_.coeffRef(3, 3) = (double)G * J / l;
+                matrixK_.coeffRef(3, 9) = (double)-G * J / l;
+                matrixK_.coeffRef(9, 3) = (double)-G * J / l;
+                matrixK_.coeffRef(9, 9) = (double)G * J / l;
+
+                matrixK_.coeffRef(1, 1) = (double)12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(1, 5) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(1, 7) = (double)-12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(1, 11) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(5, 1) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(5, 5) = (double)4 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(5, 7) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(5, 11) = (double)2 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(7, 1) = (double)-12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(7, 5) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(7, 7) = (double)12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(7, 11) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(11, 1) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(11, 5) = (double)2 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(11, 7) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(11, 11) = (double)4 * E * Iz / pow(l, 1);
+
+                matrixK_.coeffRef(2, 2) = (double)12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(2, 4) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(2, 8) = (double)-12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(2, 10) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(4, 2) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(4, 4) = (double)4 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(4, 8) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(4, 10) = (double)2 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(8, 2) = (double)-12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(8, 4) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(8, 8) = (double)12 * E * Iz / pow(l, 3);
+                matrixK_.coeffRef(8, 10) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(10, 2) = (double)-6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(10, 4) = (double)2 * E * Iz / pow(l, 1);
+                matrixK_.coeffRef(10, 8) = (double)6 * E * Iz / pow(l, 2);
+                matrixK_.coeffRef(10, 10) = (double)4 * E * Iz / pow(l, 1);
+            }
+            //K = T(T) * K_ * T
+            matrixK = matrixT.transpose() * matrixK_ * matrixT;
+
+            Eigen::MatrixXd matrixy(12, 1);
+            for (int j = 0;j < 6;j++)
+            {
+                matrixy.coeffRef(j, 0) = matrixx.coeff(v1Index * 6 + j, 0);
+                matrixy.coeffRef(j + 6, 0) = matrixx.coeff(v2Index * 6 + j, 0);
+            }
+
+            Eigen::MatrixXd matrixc = matrixK * matrixy;
+            
+            double M1 = sqrt(pow(matrixc.coeff(3, 0), 2) + pow(matrixc.coeff(4, 0), 2) + pow(matrixc.coeff(5, 0), 2));
+            double M2 = sqrt(pow(matrixc.coeff(9, 0), 2) + pow(matrixc.coeff(10, 0), 2) + pow(matrixc.coeff(11, 0), 2));
+
+            printf("beam%d: Mv%d:%.2lf   Mv%d:%.2lf\n", i, v1Index, M1, v2Index, M2);
+        }//对每根梁的循环
     }
 }
